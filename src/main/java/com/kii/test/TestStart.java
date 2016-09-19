@@ -14,6 +14,8 @@ public class TestStart {
 			TestCreateObjects.run(site, threads, bucketType, bucketID);
 		} else if (args[0].equals("updateObjects")) {
 			TestUpdateObjects.run(site, threads, bucketType, bucketID);
+		} else if (args[0].equals("updateObjectsDiff")) {
+			TestUpdateObjectsDifferentBuckets.run(site, threads, bucketType);
 		} else if (args[0].equals("updateStateREST")) {
 			TestUpdateStateREST.run(site, threads);
 		} else if (args[0].equals("updateStateMQTT")) {
