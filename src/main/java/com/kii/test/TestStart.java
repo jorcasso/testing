@@ -20,6 +20,8 @@ public class TestStart {
 			TestUpdateStateREST.run(site, threads);
 		} else if (args[0].equals("updateStateMQTT")) {
 			TestUpdateStateMQTT.run(site, threads);
+		} else if (args[0].equals("updateStateRESTWithThingToken")) {
+			TestUpdateStateRESTWithThingToken.run(site, threads);
 		} else {
 			System.out.println("Unknown argument " + args[0]);
 		}
