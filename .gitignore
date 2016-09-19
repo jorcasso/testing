@@ -1,0 +1,11 @@
+.classpath
+.project
+.gradle
+.settings
+bin/
+build/
+src/main/resources/com/kii/test/apps
+src/main/resources/com/kii/test/sites
+src/main/resources/com/kii/test/dev-tokens
+src/main/resources/com/kii/test/stg-tokens
+src/main/resources/com/kii/test/prod-tokens
