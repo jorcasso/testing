@@ -38,10 +38,19 @@ public class TokenUtil {
 	}
 
 	public static String getToken(Site site) {
-		return devTokens.get(0);
+		return getToken(site, 0);
 	}
 
 	public static String getToken(Site site, int position) {
-		return devTokens.get(position);
+		switch (site) {
+		case DEV_JP:
+			return devTokens.get(position);
+		case STG_JP:
+			return stgTokens.get(position);
+		case PROD_JP:
+			return prodTokens.get(position);
+		default:
+			throw new RuntimeException("Unknown site " + site);
+		}
 	}
 }
