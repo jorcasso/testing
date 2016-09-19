@@ -34,7 +34,8 @@ public class TestUpdateObjects {
 	}
 
 	private TestUpdateObjects(Site site, int threads, String bucketType, String bucketID) throws Exception {
-		this.objectsURI = String.format(OBJECTS_PATH_TEMPLATE, SiteUtil.getApp(site), bucketType, bucketID);
+		this.objectsURI = SiteUtil.getUfeURI(site,
+				String.format(OBJECTS_PATH_TEMPLATE, SiteUtil.getApp(site), bucketType, bucketID));
 		this.accessToken = TokenUtil.getToken(site);
 
 		System.setProperty("http.maxConnections", "" + threads);
