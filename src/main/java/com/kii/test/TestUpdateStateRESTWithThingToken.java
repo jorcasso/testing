@@ -94,7 +94,8 @@ public class TestUpdateStateRESTWithThingToken {
 			List<ThingInfo> things = new CopyOnWriteArrayList<>();
 
 			for (int i = 0; i < AMOUNT; i++) {
-				String vendorThingID = VENDOR_THING_ID_PREFIX + i; // + "-" + System.currentTimeMillis();
+				String vendorThingID = VENDOR_THING_ID_PREFIX + i; // + "-" +
+																	// System.currentTimeMillis();
 				futures.add(executor.submit(() -> things.add(onboardThing(vendorThingID))));
 
 				if (i % 20 == 0) {
@@ -110,16 +111,23 @@ public class TestUpdateStateRESTWithThingToken {
 			futures.clear();
 
 			List<Long> singleTimes = new CopyOnWriteArrayList<>();
-			long time1 = System.currentTimeMillis();
+			List<Long> delayTimes = new CopyOnWriteArrayList<>();
+			long startTime = System.currentTimeMillis() + 2000;
 
 			for (ThingInfo thingInfo : things) {
 				futures.add(executor.submit(() -> {
 					HttpEntity<String> requestEntity = updateStateRequestEntity(
 							THING_TOKEN_FLAG ? thingInfo.token : accessToken, fieldValue);
 
+					long delayStart = startTime - System.currentTimeMillis();
+					if (delayStart > 0)
+						Thread.sleep(delayStart);
+
 					long t1 = System.currentTimeMillis();
 					updateState(thingInfo, requestEntity);
 					singleTimes.add(System.currentTimeMillis() - t1);
+					delayTimes.add(t1 - startTime);
+					return null;
 				}));
 			}
 
@@ -129,10 +137,13 @@ public class TestUpdateStateRESTWithThingToken {
 
 			long time2 = System.currentTimeMillis();
 
-			System.out.println("Elapsed time: " + (time2 - time1) + " ms");
+			System.out.println("Elapsed time: " + (time2 - startTime) + " ms");
 			LogUtil.logMinTime(singleTimes);
 			LogUtil.logMaxTime(singleTimes);
 			LogUtil.logAvgTime(singleTimes);
+			LogUtil.logMinDelay(delayTimes);
+			LogUtil.logMaxDelay(delayTimes);
+			LogUtil.logAvgDelay(delayTimes);
 		} finally {
 			executor.shutdown();
 		}
