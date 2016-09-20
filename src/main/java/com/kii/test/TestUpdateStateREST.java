@@ -17,6 +17,7 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
+import com.kii.test.util.LogUtil;
 import com.kii.test.util.Site;
 import com.kii.test.util.SiteUtil;
 import com.kii.test.util.TokenUtil;
@@ -122,33 +123,12 @@ public class TestUpdateStateREST {
 			long time2 = System.currentTimeMillis();
 
 			System.out.println("Elapsed time: " + (time2 - time1) + " ms");
-			logMin(singleTimes);
-			logMax(singleTimes);
-			logAvg(singleTimes);
+			LogUtil.logMinTime(singleTimes);
+			LogUtil.logMaxTime(singleTimes);
+			LogUtil.logAvgTime(singleTimes);
 		} finally {
 			executor.shutdown();
 		}
-	}
-
-	private void logMax(List<Long> singleTimes) {
-		long max = singleTimes.stream().max((o1, o2) -> o1.compareTo(o2)).get();
-		System.out.println("Max: " + max + " ms");
-	}
-
-	private void logMin(List<Long> singleTimes) {
-		long min = singleTimes.stream().min((o1, o2) -> o1.compareTo(o2)).get();
-		System.out.println("Min: " + min + " ms");
-	}
-
-	private void logAvg(List<Long> singleTimes) {
-		double total = 0;
-
-		for (long singleTime : singleTimes) {
-			total += singleTime;
-		}
-
-		double avg = total / singleTimes.size();
-		System.out.println("Avg: " + avg + " ms");
 	}
 
 	private String onboardThing(String vendorThingID) throws JSONException {

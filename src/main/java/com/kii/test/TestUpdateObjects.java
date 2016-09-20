@@ -2,6 +2,8 @@ package com.kii.test;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import com.kii.test.util.LogUtil;
 import com.kii.test.util.Site;
 import com.kii.test.util.SiteUtil;
 import com.kii.test.util.TokenUtil;
@@ -26,22 +29,30 @@ public class TestUpdateObjects {
 	private static final String OBJECTS_PATH_TEMPLATE = "/apps/%s/buckets/%s:%s/objects";
 
 	private final RestTemplate restTemplate;
-	private final String objectsURI;
-	private final String accessToken;
+	private final Site site;
+	private final String appID;
+	private final String bucketType;
+	private final Optional<String> accessToken;
+	private final Optional<String> bucketID;
 
-	public static void run(Site site, int threads, String bucketType, String bucketID) throws Exception {
-		new TestUpdateObjects(site, threads, bucketType, bucketID);
+	public static void run(Site site, int threads, String bucketType, UpdateObjectsMode mode, String bucketID)
+			throws Exception {
+		new TestUpdateObjects(site, threads, bucketType, mode, bucketID);
 	}
 
-	private TestUpdateObjects(Site site, int threads, String bucketType, String bucketID) throws Exception {
-		this.objectsURI = SiteUtil.getUfeURI(site,
-				String.format(OBJECTS_PATH_TEMPLATE, SiteUtil.getApp(site), bucketType, bucketID));
-		this.accessToken = TokenUtil.getToken(site);
+	private TestUpdateObjects(Site site, int threads, String bucketType, UpdateObjectsMode mode, String bucketID)
+			throws Exception {
+		this.site = site;
+		this.appID = SiteUtil.getApp(site);
+		this.bucketType = bucketType;
+		this.accessToken = mode.sameToken() ? Optional.of(TokenUtil.getToken(site)) : Optional.empty();
+		this.bucketID = mode.sameBucket() ? Optional.of(bucketID) : Optional.empty();
 
 		System.setProperty("http.maxConnections", "" + threads);
 		restTemplate = new RestTemplate(new HttpComponentsClientHttpRequestFactory());
 
-		System.out.println("Going to update " + AMOUNT + " objects in " + bucketType + ":" + bucketID + " bucket");
+		System.out.println(String.format("Going to update %d objects. bucketType=%s, mode=%s, bucketID=%s", AMOUNT,
+				bucketType, mode, this.bucketID.orElse("")));
 
 		if (threads > 1) {
 			updateObjectMultiThread(threads);
@@ -53,49 +64,60 @@ public class TestUpdateObjects {
 	private void updateObjectSingleThread() throws JSONException {
 		System.out.println("Single thread");
 
-		List<String> objects = new LinkedList<>();
+		List<String> objectPaths = new LinkedList<>();
 		List<Long> singleTimes = new LinkedList<>();
 
 		for (int i = 0; i < AMOUNT; i++) {
-			String objectID = createObject();
-			objects.add(objectID);
+			final int pos = i;
+			String bucketID = this.bucketID.orElseGet(() -> UUID.randomUUID().toString());
+			String path = SiteUtil.getUfeURI(site, String.format(OBJECTS_PATH_TEMPLATE, appID, bucketType, bucketID));
+			String objectID = createObject(path, accessToken.orElseGet(() -> TokenUtil.getToken(site, pos)));
+			objectPaths.add(path + "/" + objectID);
 		}
-
-		HttpEntity<String> requestEntity = updateObjectRequestEntity("jiji");
 
 		long time1 = System.currentTimeMillis();
 
-		for (String objectID : objects) {
+		for (int i = 0; i < objectPaths.size(); i++) {
+			final int pos = i;
+			String objectPath = objectPaths.get(pos);
+			String accessToken = this.accessToken.orElseGet(() -> TokenUtil.getToken(site, pos));
+
+			HttpEntity<String> requestEntity = updateObjectRequestEntity("jiji", accessToken);
 
 			long t1 = System.currentTimeMillis();
-			updateObject(objectID, requestEntity);
+			updateObject(objectPath, requestEntity);
 			singleTimes.add(System.currentTimeMillis() - t1);
 		}
 		long time2 = System.currentTimeMillis();
 
-		System.out.println("Elapsed time: " + (time2 - time1) + " ms");
-
 		for (int i = 0; i < singleTimes.size(); i++) {
 			System.out.println(String.format("Single time #%d: %d ms", i + 1, singleTimes.get(i)));
 		}
+
+		System.out.println("Elapsed time: " + (time2 - time1) + " ms");
+		LogUtil.logMinTime(singleTimes);
+		LogUtil.logMaxTime(singleTimes);
+		LogUtil.logAvgTime(singleTimes);
 	}
 
 	private void updateObjectMultiThread(int threads) throws Exception {
 		System.out.println("Multithread (" + threads + ")");
 
-		HttpEntity<String> requestEntity = updateObjectRequestEntity("jiji");
-
 		ExecutorService executor = Executors.newFixedThreadPool(threads);
 
 		try {
-			List<String> objects = new CopyOnWriteArrayList<>();
+			List<String> objectPaths = new CopyOnWriteArrayList<>();
 			List<Long> singleTimes = new CopyOnWriteArrayList<>();
 			List<Future<?>> futures = new LinkedList<>();
 
 			for (int i = 0; i < AMOUNT; i++) {
+				final int pos = i;
 				futures.add(executor.submit(() -> {
-					String objectID = createObject();
-					objects.add(objectID);
+					String bucketID = this.bucketID.orElseGet(() -> UUID.randomUUID().toString());
+					String path = SiteUtil.getUfeURI(site,
+							String.format(OBJECTS_PATH_TEMPLATE, appID, bucketType, bucketID));
+					String objectID = createObject(path, accessToken.orElseGet(() -> TokenUtil.getToken(site, pos)));
+					objectPaths.add(path + "/" + objectID);
 					return null;
 				}));
 			}
@@ -105,19 +127,20 @@ public class TestUpdateObjects {
 			}
 			futures.clear();
 
-			// restTemplate.setInterceptors(Arrays.asList((request, body,
-			// execution) -> {
-			// long time = System.currentTimeMillis();
-			// System.out.println(time + " - " + (time / 1000));
-			// return execution.execute(request, body);
-			// }));
-
 			long time1 = System.currentTimeMillis();
 
-			for (String objectID : objects) {
+			for (int i = 0; i < objectPaths.size(); i++) {
+				final int pos = i;
+
 				futures.add(executor.submit(() -> {
+
+					String objectPath = objectPaths.get(pos);
+					String accessToken = this.accessToken.orElseGet(() -> TokenUtil.getToken(site, pos));
+
+					HttpEntity<String> requestEntity = updateObjectRequestEntity("jiji", accessToken);
+
 					long t1 = System.currentTimeMillis();
-					updateObject(objectID, requestEntity);
+					updateObject(objectPath, requestEntity);
 					singleTimes.add(System.currentTimeMillis() - t1);
 				}));
 			}
@@ -128,17 +151,20 @@ public class TestUpdateObjects {
 
 			long time2 = System.currentTimeMillis();
 
-			System.out.println("Elapsed time: " + (time2 - time1) + " ms");
-
 			for (int i = 0; i < singleTimes.size(); i++) {
 				System.out.println(String.format("Single time #%d: %d ms", i + 1, singleTimes.get(i)));
 			}
+
+			System.out.println("Elapsed time: " + (time2 - time1) + " ms");
+			LogUtil.logMinTime(singleTimes);
+			LogUtil.logMaxTime(singleTimes);
+			LogUtil.logAvgTime(singleTimes);
 		} finally {
 			executor.shutdown();
 		}
 	}
 
-	private String createObject() throws JSONException {
+	private String createObject(String path, String accessToken) throws JSONException {
 		// Data
 		String object = "{'field1': 'value1', 'field2': 'value2', 'subjson': {'subfield1': 234, 'subfield2': true}}"
 				.replace("'", "\"");
@@ -153,12 +179,12 @@ public class TestUpdateObjects {
 		HttpEntity<String> requestEntity = new HttpEntity<String>(object, headers);
 
 		// Request / Response
-		String response = restTemplate.exchange(objectsURI, HttpMethod.POST, requestEntity, String.class).getBody();
+		String response = restTemplate.exchange(path, HttpMethod.POST, requestEntity, String.class).getBody();
 
 		return new JSONObject(response).getString("objectID");
 	}
 
-	private HttpEntity<String> updateObjectRequestEntity(String fieldValue) {
+	private HttpEntity<String> updateObjectRequestEntity(String fieldValue, String accessToken) {
 		// Data
 		String object = ("{'field1': '" + fieldValue
 				+ "', 'field2': 'value2', 'subjson': {'subfield1': 234, 'subfield2': true}}").replace("'", "\"");
@@ -173,9 +199,9 @@ public class TestUpdateObjects {
 		return new HttpEntity<String>(object, headers);
 	}
 
-	private void updateObject(String objectID, HttpEntity<String> requestEntity) {
+	private void updateObject(String path, HttpEntity<String> requestEntity) {
 		// Request / Response
-		restTemplate.exchange(objectsURI + "/" + objectID, HttpMethod.PUT, requestEntity, String.class);
+		restTemplate.exchange(path, HttpMethod.PUT, requestEntity, String.class);
 	}
 
 }
