@@ -106,13 +106,20 @@ public class TestUpdateStateREST {
 			futures.clear();
 
 			List<Long> singleTimes = new CopyOnWriteArrayList<>();
-			long time1 = System.currentTimeMillis();
+			List<Long> delayTimes = new CopyOnWriteArrayList<>();
+			long startTime = System.currentTimeMillis() + 2000;
 
 			for (String thingID : things) {
 				futures.add(executor.submit(() -> {
+					long delayStart = startTime - System.currentTimeMillis();
+					if (delayStart > 0)
+						Thread.sleep(delayStart);
+
 					long t1 = System.currentTimeMillis();
 					updateState(thingID, requestEntity);
 					singleTimes.add(System.currentTimeMillis() - t1);
+					delayTimes.add(t1 - startTime);
+					return null;
 				}));
 			}
 
@@ -122,10 +129,13 @@ public class TestUpdateStateREST {
 
 			long time2 = System.currentTimeMillis();
 
-			System.out.println("Elapsed time: " + (time2 - time1) + " ms");
+			System.out.println("Elapsed time: " + (time2 - startTime) + " ms");
 			LogUtil.logMinTime(singleTimes);
 			LogUtil.logMaxTime(singleTimes);
 			LogUtil.logAvgTime(singleTimes);
+			LogUtil.logMinDelay(delayTimes);
+			LogUtil.logMaxDelay(delayTimes);
+			LogUtil.logAvgDelay(delayTimes);
 		} finally {
 			executor.shutdown();
 		}
