@@ -108,6 +108,7 @@ public class TestUpdateObjects {
 		try {
 			List<String> objectPaths = new CopyOnWriteArrayList<>();
 			List<Long> singleTimes = new CopyOnWriteArrayList<>();
+			List<Long> delayTimes = new CopyOnWriteArrayList<>();
 			List<Future<?>> futures = new LinkedList<>();
 
 			for (int i = 0; i < AMOUNT; i++) {
@@ -127,21 +128,26 @@ public class TestUpdateObjects {
 			}
 			futures.clear();
 
-			long time1 = System.currentTimeMillis();
+			long startTime = System.currentTimeMillis() + 2000;
 
 			for (int i = 0; i < objectPaths.size(); i++) {
 				final int pos = i;
 
 				futures.add(executor.submit(() -> {
-
 					String objectPath = objectPaths.get(pos);
 					String accessToken = this.accessToken.orElseGet(() -> TokenUtil.getToken(site, pos));
 
 					HttpEntity<String> requestEntity = updateObjectRequestEntity("jiji", accessToken);
 
+					long delayStart = startTime - System.currentTimeMillis();
+					if (delayStart > 0)
+						Thread.sleep(delayStart);
+
 					long t1 = System.currentTimeMillis();
 					updateObject(objectPath, requestEntity);
 					singleTimes.add(System.currentTimeMillis() - t1);
+					delayTimes.add(t1 - startTime);
+					return null;
 				}));
 			}
 
@@ -152,13 +158,17 @@ public class TestUpdateObjects {
 			long time2 = System.currentTimeMillis();
 
 			for (int i = 0; i < singleTimes.size(); i++) {
-				System.out.println(String.format("Single time #%d: %d ms", i + 1, singleTimes.get(i)));
+				System.out.println(String.format("Single time #%d: %d ms, delay %d", i + 1, singleTimes.get(i),
+						delayTimes.get(i)));
 			}
 
-			System.out.println("Elapsed time: " + (time2 - time1) + " ms");
+			System.out.println("Elapsed time: " + (time2 - startTime) + " ms");
 			LogUtil.logMinTime(singleTimes);
 			LogUtil.logMaxTime(singleTimes);
 			LogUtil.logAvgTime(singleTimes);
+			LogUtil.logMinDelay(delayTimes);
+			LogUtil.logMaxDelay(delayTimes);
+			LogUtil.logAvgDelay(delayTimes);
 		} finally {
 			executor.shutdown();
 		}
