@@ -14,6 +14,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -31,6 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import com.kii.test.util.LogUtil;
 import com.kii.test.util.Site;
 import com.kii.test.util.SiteUtil;
 import com.kii.test.util.TokenUtil;
@@ -43,6 +46,8 @@ public class TestUpdateStateMQTT {
 	private static final String MQTT_TOPIC_TEMPLATE = "p/%s/thing-if/apps/%s/targets/THING:%s/states";
 	private static final String VENDOR_THING_ID_PREFIX = "testUpdateState";
 	private static final byte[] CRLF = new byte[] { 13, 10 };
+
+	private static final boolean THING_TOKEN_FLAG = true;
 
 	private final List<MqttAsyncClient> clients = new LinkedList<>();
 	private final RestTemplate restTemplate = new RestTemplate(new HttpComponentsClientHttpRequestFactory());
@@ -83,19 +88,22 @@ public class TestUpdateStateMQTT {
 	private void updateStateSingleThread() throws Exception {
 		System.out.println("Single thread");
 
-		Map<String, MqttAsyncClient> things = new HashMap<>();
+		Map<ThingInfo, MqttAsyncClient> things = new HashMap<>();
 
 		for (int i = 0; i < AMOUNT; i++) {
 			JSONObject response = onboardThing(VENDOR_THING_ID_PREFIX + i);
 			MqttAsyncClient client = getClient(response.getJSONObject("mqttEndpoint"));
-			things.put(response.getString("thingID"), client);
+			things.put(new ThingInfo(response.getString("accessToken"), response.getString("thingID")), client);
 		}
 
+		List<AtomicLong> singleTimes = new CopyOnWriteArrayList<>();
 		List<CountDownLatch> latches = new LinkedList<>();
 		long time1 = System.currentTimeMillis();
 
-		for (Entry<String, MqttAsyncClient> entry : things.entrySet()) {
-			latches.add(updateState(entry.getValue(), entry.getKey()));
+		for (Entry<ThingInfo, MqttAsyncClient> entry : things.entrySet()) {
+			AtomicLong t1 = new AtomicLong(0);
+			latches.add(updateState(entry.getValue(), entry.getKey(), t1));
+			singleTimes.add(t1);
 		}
 
 		long time2 = System.currentTimeMillis();
@@ -109,6 +117,9 @@ public class TestUpdateStateMQTT {
 		}
 		time2 = System.currentTimeMillis();
 		System.out.println("Response elapsed time: " + (time2 - time1) + " ms");
+		LogUtil.logMinTime(singleTimes.stream().map(AtomicLong::get).collect(Collectors.toList()));
+		LogUtil.logMaxTime(singleTimes.stream().map(AtomicLong::get).collect(Collectors.toList()));
+		LogUtil.logAvgTime(singleTimes.stream().map(AtomicLong::get).collect(Collectors.toList()));
 	}
 
 	private void updateStateMultiThread(int threads) throws Exception {
@@ -117,7 +128,7 @@ public class TestUpdateStateMQTT {
 		ExecutorService executor = Executors.newFixedThreadPool(threads);
 
 		try {
-			Map<String, MqttAsyncClient> things = new ConcurrentHashMap<>();
+			Map<ThingInfo, MqttAsyncClient> things = new ConcurrentHashMap<>();
 			List<Future<?>> futures = new LinkedList<>();
 
 			for (int i = 0; i < AMOUNT; i++) {
@@ -125,7 +136,7 @@ public class TestUpdateStateMQTT {
 				futures.add(executor.submit(() -> {
 					JSONObject response = onboardThing(vendorThingID);
 					MqttAsyncClient client = getClient(response.getJSONObject("mqttEndpoint"));
-					things.put(response.getString("thingID"), client);
+					things.put(new ThingInfo(response.getString("accessToken"), response.getString("thingID")), client);
 					return null;
 				}));
 			}
@@ -135,12 +146,15 @@ public class TestUpdateStateMQTT {
 			}
 			futures.clear();
 
+			List<AtomicLong> singleTimes = new CopyOnWriteArrayList<>();
 			List<CountDownLatch> latches = new CopyOnWriteArrayList<>();
 			long time1 = System.currentTimeMillis();
 
-			for (Entry<String, MqttAsyncClient> entry : things.entrySet()) {
+			for (Entry<ThingInfo, MqttAsyncClient> entry : things.entrySet()) {
 				futures.add(executor.submit(() -> {
-					latches.add(updateState(entry.getValue(), entry.getKey()));
+					AtomicLong t1 = new AtomicLong(0);
+					latches.add(updateState(entry.getValue(), entry.getKey(), t1));
+					singleTimes.add(t1);
 					return null;
 				}));
 			}
@@ -158,7 +172,11 @@ public class TestUpdateStateMQTT {
 				}
 			}
 			time2 = System.currentTimeMillis();
+
 			System.out.println("Response elapsed time: " + (time2 - time1) + " ms");
+			LogUtil.logMinTime(singleTimes.stream().map(AtomicLong::get).collect(Collectors.toList()));
+			LogUtil.logMaxTime(singleTimes.stream().map(AtomicLong::get).collect(Collectors.toList()));
+			LogUtil.logAvgTime(singleTimes.stream().map(AtomicLong::get).collect(Collectors.toList()));
 		} finally {
 			executor.shutdown();
 		}
@@ -204,8 +222,9 @@ public class TestUpdateStateMQTT {
 		return client;
 	}
 
-	private CountDownLatch updateState(MqttAsyncClient client, String thingID) throws Exception {
-		String sendTopic = String.format(MQTT_TOPIC_TEMPLATE, client.getClientId(), appID, thingID);
+	private CountDownLatch updateState(MqttAsyncClient client, ThingInfo thingInfo, AtomicLong singleTime) throws Exception {
+		String sendTopic = String.format(MQTT_TOPIC_TEMPLATE, client.getClientId(), appID, thingInfo.thingID);
+		AtomicLong t1 = new AtomicLong(0);
 
 		CountDownLatch latch = new CountDownLatch(1);
 		client.setCallback(new MqttCallback() {
@@ -213,6 +232,7 @@ public class TestUpdateStateMQTT {
 			@Override
 			public void messageArrived(String topic, MqttMessage message) throws Exception {
 				if (topic.equals(sendTopic)) {
+					singleTime.set(System.currentTimeMillis() - t1.get());
 					latch.countDown();
 					// System.out.println(new String(message.getPayload()));
 				}
@@ -230,12 +250,13 @@ public class TestUpdateStateMQTT {
 		});
 
 		JSONObject body = new JSONObject().put("field1", "something").put("field2", "value2");
-		byte[] requestPayload = buildPublishRequestPayload(body);
+		byte[] requestPayload = buildPublishRequestPayload(body, THING_TOKEN_FLAG ? thingInfo.token : accessToken);
 
 		MqttMessage message = new MqttMessage();
 		message.setPayload(requestPayload);
 		message.setQos(0);
 
+		t1.set(System.currentTimeMillis());
 		client.publish(sendTopic, message);
 
 		return latch;
@@ -245,7 +266,7 @@ public class TestUpdateStateMQTT {
 		return String.format(MQTT_URI_TEMPLATE, host, port);
 	}
 
-	protected byte[] buildPublishRequestPayload(JSONObject body) throws IOException {
+	protected byte[] buildPublishRequestPayload(JSONObject body, String token) throws IOException {
 		ByteArrayOutputStream bArray = new ByteArrayOutputStream();
 
 		try {
@@ -256,7 +277,7 @@ public class TestUpdateStateMQTT {
 			// Write headers
 			bArray.write("Content-Type:application/json".getBytes());
 			bArray.write(CRLF);
-			bArray.write(("Authorization:Bearer " + accessToken).getBytes());
+			bArray.write(("Authorization:Bearer " + token).getBytes());
 			bArray.write(CRLF);
 
 			// Write body
@@ -266,6 +287,16 @@ public class TestUpdateStateMQTT {
 			return bArray.toByteArray();
 		} finally {
 			bArray.close();
+		}
+	}
+
+	static class ThingInfo {
+		String token;
+		String thingID;
+
+		public ThingInfo(String token, String thingID) {
+			this.token = token;
+			this.thingID = thingID;
 		}
 	}
 }
