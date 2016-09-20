@@ -93,7 +93,7 @@ public class TestUpdateStateRESTWithThingToken {
 			List<ThingInfo> things = new CopyOnWriteArrayList<>();
 
 			for (int i = 0; i < AMOUNT; i++) {
-				String vendorThingID = VENDOR_THING_ID_PREFIX + i + "-" + System.currentTimeMillis();
+				String vendorThingID = VENDOR_THING_ID_PREFIX + i; // + "-" + System.currentTimeMillis();
 				futures.add(executor.submit(() -> things.add(onboardThing(vendorThingID))));
 
 				if (i % 20 == 0) {
@@ -159,31 +159,25 @@ public class TestUpdateStateRESTWithThingToken {
 	}
 
 	private ThingInfo onboardThing(String vendorThingID) throws JSONException {
-		ThingInfo thingInfo = getThingInfo(vendorThingID);
-		if (thingInfo != null) {
-			return thingInfo;
-		} else {
-			String body = ("{'vendorThingID': '" + vendorThingID + "', 'thingPassword': '123456'}").replace("'", "\"");
+		String body = ("{'vendorThingID': '" + vendorThingID + "', 'thingPassword': '123456'}").replace("'", "\"");
 
-			// Headers
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(
-					MediaType.parseMediaType("application/vnd.kii.OnboardingWithVendorThingIDByThing+json"));
-			headers.set("Authorization", "Bearer " + accessToken);
-			headers.set("Connection", "keep-alive");
+		// Headers
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.parseMediaType("application/vnd.kii.OnboardingWithVendorThingIDByThing+json"));
+		headers.set("Authorization", "Bearer " + accessToken);
+		headers.set("Connection", "keep-alive");
 
-			// Entity
-			HttpEntity<String> requestEntity = new HttpEntity<String>(body, headers);
+		// Entity
+		HttpEntity<String> requestEntity = new HttpEntity<String>(body, headers);
 
-			// Request / Response
-			String response = restTemplate
-					.exchange(SiteUtil.getThingIFURI(site, String.format(ONBOARDING_PATH_TEMPLATE, appID)),
-							HttpMethod.POST, requestEntity, String.class)
-					.getBody();
+		// Request / Response
+		String uri = SiteUtil.getThingIFURI(site, String.format(ONBOARDING_PATH_TEMPLATE, appID));
+		String response = "";
+		response = restTemplate.exchange(uri, HttpMethod.POST, requestEntity, String.class).getBody();
 
-			JSONObject responseJSON = new JSONObject(response);
-			return new ThingInfo(responseJSON.optString("accessToken"), responseJSON.optString("thingID"));
-		}
+		JSONObject responseJSON = new JSONObject(response);
+		return new ThingInfo(responseJSON.optString("accessToken"), responseJSON.optString("thingID"));
+
 	}
 
 	private ThingInfo getThingInfo(String vendorThingID) throws JSONException {
