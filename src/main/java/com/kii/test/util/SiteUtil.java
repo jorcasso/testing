@@ -14,6 +14,8 @@ public class SiteUtil {
 	private static String UFE_LOCAL;
 
 	private static String THING_IF_DEV_JP;
+	private static String THING_IF_DEV_JP_01;
+	private static String THING_IF_DEV_JP_02;
 	private static String THING_IF_STG_JP;
 	private static String THING_IF_PROD_JP;
 	private static String THING_IF_LOCAL;
@@ -43,6 +45,8 @@ public class SiteUtil {
 			UFE_PROD_JP = sites.getProperty("ufe-prod-jp");
 			UFE_LOCAL = sites.getProperty("ufe-local");
 			THING_IF_DEV_JP = sites.getProperty("thing-if-dev-jp");
+			THING_IF_DEV_JP_01 = sites.getProperty("thing-if-dev-jp-01");
+			THING_IF_DEV_JP_02 = sites.getProperty("thing-if-dev-jp-02");
 			THING_IF_STG_JP = sites.getProperty("thing-if-stg-jp");
 			THING_IF_PROD_JP = sites.getProperty("thing-if-prod-jp");
 			THING_IF_LOCAL = sites.getProperty("thing-if-local");
@@ -99,6 +103,10 @@ public class SiteUtil {
 		switch (site) {
 		case DEV_JP:
 			return THING_IF_DEV_JP + separator + path;
+		case DEV_JP_01:
+			return THING_IF_DEV_JP_01 + separator + path;
+		case DEV_JP_02:
+			return THING_IF_DEV_JP_02 + separator + path;
 		case STG_JP:
 			return THING_IF_STG_JP + separator + path;
 		case PROD_JP:
