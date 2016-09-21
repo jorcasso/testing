@@ -44,6 +44,7 @@ public class TokenUtil {
 	public static String getToken(Site site, int position) {
 		switch (site) {
 		case DEV_JP:
+		case DEV_JP_01:
 		case DEV_JP_02:
 		case DEV_JP_LOCAL:
 			return devTokens.get(position);
