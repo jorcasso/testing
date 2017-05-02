@@ -45,4 +45,8 @@ public class LogUtil {
 		double avg = total / delayTimes.size();
 		System.out.println("Delay Avg: " + avg + " ms");
 	}
+	
+	public static void log(String message) {
+		System.out.println(message);
+	}
 }

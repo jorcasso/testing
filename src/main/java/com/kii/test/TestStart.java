@@ -22,7 +22,11 @@ public class TestStart {
 		} else if (args[0].equals("updateStateMQTT")) {
 			TestUpdateStateMQTT.run(site, threads);
 		} else if (args[0].equals("updateStateRESTWithThingToken")) {
-			TestUpdateStateRESTWithThingToken.run(site, threads);
+			boolean hasTraits = false; // by default
+			if (args.length>3) {
+				hasTraits = Boolean.parseBoolean(args[3]);
+			}
+			TestUpdateStateRESTWithThingToken.run(site, threads, hasTraits);
 		} else {
 			System.out.println("Unknown argument " + args[0]);
 		}
