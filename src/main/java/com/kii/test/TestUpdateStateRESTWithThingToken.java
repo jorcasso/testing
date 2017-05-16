@@ -1,8 +1,8 @@
 package com.kii.test;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -111,7 +111,7 @@ public class TestUpdateStateRESTWithThingToken {
 		try {
 			List<Future<?>> futures = new LinkedList<>();
 
-			List<ThingInfo> things = new CopyOnWriteArrayList<>();
+			List<ThingInfo> things = Collections.synchronizedList(new LinkedList<>());
 
 			for (int i = 0; i < AMOUNT; i++) {
 				String vendorThingID = VENDOR_THING_ID_PREFIX + System.currentTimeMillis() + i;
@@ -129,8 +129,8 @@ public class TestUpdateStateRESTWithThingToken {
 			}
 			futures.clear();
 
-			List<Long> singleTimes = new CopyOnWriteArrayList<>();
-			List<Long> delayTimes = new CopyOnWriteArrayList<>();
+			List<Long> singleTimes = Collections.synchronizedList(new LinkedList<>());
+			List<Long> delayTimes = Collections.synchronizedList(new LinkedList<>());
 			long startTime = System.currentTimeMillis() + 2000;
 
 			for (ThingInfo thingInfo : things) {
@@ -204,7 +204,7 @@ public class TestUpdateStateRESTWithThingToken {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		HttpEntity<String> requestEntity = new HttpEntity<String>(body, headers);
+		HttpEntity<String> requestEntity = new HttpEntity<>(body, headers);
 
 		// Request / Response
 		String uri = SiteUtil.getThingIFURI(site, String.format(ONBOARDING_PATH_TEMPLATE, appID));
@@ -313,7 +313,7 @@ public class TestUpdateStateRESTWithThingToken {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		HttpEntity<Void> requestEntity = new HttpEntity<Void>(headers);
+		HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
 		// Request / Response
 		try {
@@ -344,7 +344,7 @@ public class TestUpdateStateRESTWithThingToken {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		return new HttpEntity<String>(object, headers);
+		return new HttpEntity<>(object, headers);
 	}
 
 	private HttpEntity<String> updateStateWithTraitsRequestEntity(String token, String alias, String fieldValue) {
@@ -359,7 +359,7 @@ public class TestUpdateStateRESTWithThingToken {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		return new HttpEntity<String>(object, headers);
+		return new HttpEntity<>(object, headers);
 	}
 
 	private void updateState(ThingInfo thingInfo, HttpEntity<String> requestEntity) {

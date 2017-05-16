@@ -1,10 +1,10 @@
 package com.kii.test;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -106,9 +106,9 @@ public class TestUpdateObjects {
 		ExecutorService executor = Executors.newFixedThreadPool(threads);
 
 		try {
-			List<String> objectPaths = new CopyOnWriteArrayList<>();
-			List<Long> singleTimes = new CopyOnWriteArrayList<>();
-			List<Long> delayTimes = new CopyOnWriteArrayList<>();
+			List<String> objectPaths = Collections.synchronizedList(new LinkedList<>());
+			List<Long> singleTimes = Collections.synchronizedList(new LinkedList<>());
+			List<Long> delayTimes = Collections.synchronizedList(new LinkedList<>());
 			List<Future<?>> futures = new LinkedList<>();
 
 			for (int i = 0; i < AMOUNT; i++) {
@@ -186,7 +186,7 @@ public class TestUpdateObjects {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		HttpEntity<String> requestEntity = new HttpEntity<String>(object, headers);
+		HttpEntity<String> requestEntity = new HttpEntity<>(object, headers);
 
 		// Request / Response
 		String response = restTemplate.exchange(path, HttpMethod.POST, requestEntity, String.class).getBody();
@@ -206,7 +206,7 @@ public class TestUpdateObjects {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		return new HttpEntity<String>(object, headers);
+		return new HttpEntity<>(object, headers);
 	}
 
 	private void updateObject(String path, HttpEntity<String> requestEntity) {

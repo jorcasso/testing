@@ -1,8 +1,8 @@
 package com.kii.test;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -87,7 +87,7 @@ public class TestUpdateStateREST {
 		try {
 			List<Future<?>> futures = new LinkedList<>();
 
-			List<String> things = new LinkedList<>();
+			List<String> things = Collections.synchronizedList(new LinkedList<>());
 
 			for (int i = 0; i < AMOUNT; i++) {
 				String vendorThingID = VENDOR_THING_ID_PREFIX + i;
@@ -105,8 +105,8 @@ public class TestUpdateStateREST {
 			}
 			futures.clear();
 
-			List<Long> singleTimes = new CopyOnWriteArrayList<>();
-			List<Long> delayTimes = new CopyOnWriteArrayList<>();
+			List<Long> singleTimes = Collections.synchronizedList(new LinkedList<>());
+			List<Long> delayTimes = Collections.synchronizedList(new LinkedList<>());
 			long startTime = System.currentTimeMillis() + 2000;
 
 			for (String thingID : things) {
@@ -156,7 +156,7 @@ public class TestUpdateStateREST {
 			headers.set("Connection", "keep-alive");
 
 			// Entity
-			HttpEntity<String> requestEntity = new HttpEntity<String>(body, headers);
+			HttpEntity<String> requestEntity = new HttpEntity<>(body, headers);
 
 			// Request / Response
 			String response = restTemplate
@@ -175,7 +175,7 @@ public class TestUpdateStateREST {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		HttpEntity<Void> requestEntity = new HttpEntity<Void>(headers);
+		HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
 		// Request / Response
 		try {
@@ -205,7 +205,7 @@ public class TestUpdateStateREST {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		return new HttpEntity<String>(object, headers);
+		return new HttpEntity<>(object, headers);
 	}
 
 	private void updateState(String thingID, HttpEntity<String> requestEntity) {

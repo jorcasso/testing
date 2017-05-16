@@ -2,13 +2,13 @@ package com.kii.test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -96,7 +96,7 @@ public class TestUpdateStateMQTT {
 			things.put(new ThingInfo(response.getString("accessToken"), response.getString("thingID")), client);
 		}
 
-		List<AtomicLong> singleTimes = new CopyOnWriteArrayList<>();
+		List<AtomicLong> singleTimes = Collections.synchronizedList(new LinkedList<>());
 		List<CountDownLatch> latches = new LinkedList<>();
 		long time1 = System.currentTimeMillis();
 
@@ -146,8 +146,8 @@ public class TestUpdateStateMQTT {
 			}
 			futures.clear();
 
-			List<AtomicLong> singleTimes = new CopyOnWriteArrayList<>();
-			List<CountDownLatch> latches = new CopyOnWriteArrayList<>();
+			List<AtomicLong> singleTimes = Collections.synchronizedList(new LinkedList<>());
+			List<CountDownLatch> latches = Collections.synchronizedList(new LinkedList<>());
 			long time1 = System.currentTimeMillis();
 
 			for (Entry<ThingInfo, MqttAsyncClient> entry : things.entrySet()) {
@@ -192,7 +192,7 @@ public class TestUpdateStateMQTT {
 		headers.set("Connection", "keep-alive");
 
 		// Entity
-		HttpEntity<String> requestEntity = new HttpEntity<String>(body, headers);
+		HttpEntity<String> requestEntity = new HttpEntity<>(body, headers);
 
 		// Request / Response
 		String response = restTemplate.exchange(onboardingURI, HttpMethod.POST, requestEntity, String.class).getBody();
@@ -222,7 +222,8 @@ public class TestUpdateStateMQTT {
 		return client;
 	}
 
-	private CountDownLatch updateState(MqttAsyncClient client, ThingInfo thingInfo, AtomicLong singleTime) throws Exception {
+	private CountDownLatch updateState(MqttAsyncClient client, ThingInfo thingInfo, AtomicLong singleTime)
+			throws Exception {
 		String sendTopic = String.format(MQTT_TOPIC_TEMPLATE, client.getClientId(), appID, thingInfo.thingID);
 		AtomicLong t1 = new AtomicLong(0);
 
